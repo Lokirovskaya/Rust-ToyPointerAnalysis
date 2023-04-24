@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::Read;
 
-mod cfg;
 mod lexer;
 mod parser;
 // mod solver;
