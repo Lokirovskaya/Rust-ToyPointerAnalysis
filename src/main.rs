@@ -16,4 +16,5 @@ fn main() {
     parser::print_ir(&ir_list);
 
     let nodes = solver::solve(ir_list);
+    println!("{:?}", nodes);
 }

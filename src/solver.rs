@@ -5,6 +5,7 @@ use crate::parser::{Stmt, IR};
 type PointedSet = BTreeSet<String>;
 type PtrDict = HashMap<String, PointedSet>;
 
+#[derive(Debug)]
 pub struct Node {
     stmt: Option<Stmt>,
     next: Vec<usize>,
@@ -15,10 +16,13 @@ pub fn solve(ir_list: Vec<IR>) -> Vec<Node> {
     let mut nodes = Vec::<Node>::with_capacity(ir_list.len());
 
     let mut i = 0;
+    let len = ir_list.len();
     for ir in ir_list {
         let mut stmt = None;
         let mut next = Vec::<usize>::with_capacity(2);
-        next.push(i + 1);
+        if i + 1 < len {
+            next.push(i + 1);
+        }
         match ir {
             IR::Stmt(s) => stmt = Some(s),
             IR::Branch(x) => next.push(x),
@@ -36,21 +40,37 @@ pub fn solve(ir_list: Vec<IR>) -> Vec<Node> {
 
     while !queue.is_empty() {
         let node_idx = queue.pop_front().unwrap();
-        let node_mut = nodes.get_mut(node_idx).unwrap();
-        transfer(&mut node_mut.data, &node_mut.stmt);
+        let node = nodes.get_mut(node_idx).unwrap();
+        transfer(&mut node.data, &node.stmt);
 
         let node = &nodes[node_idx];
-        let out = &node.data;
-        for succ_idx in node.next.iter() {
-            let succ_node = &nodes[*succ_idx];
-            let try_data = transfer_clone(out, &succ_node.stmt);
-            if succ_node.data != try_data {
-                queue.push_back(*succ_idx);
+        let out = node.data.clone();
+        let next = node.next.clone();
+        for succ_idx in next {
+            let succ_node = nodes.get_mut(succ_idx).unwrap();
+            let data_len_before = succ_node.data.len();
+            meet(&mut succ_node.data, out.clone());
+            let data_len_after = succ_node.data.len();
+            if data_len_before != data_len_after {
+                queue.push_back(succ_idx);
             }
         }
     }
 
     return nodes;
+}
+
+fn meet(target: &mut PtrDict, src: PtrDict) {
+    for (var, set) in src {
+        if !target.contains_key(&var) {
+            target.insert(var, set);
+        }
+        else {
+            for s in set {
+                target.get_mut(&var).unwrap().insert(s);
+            }
+        }
+    }
 }
 
 fn transfer_clone(data: &PtrDict, stmt: &Option<Stmt>) -> PtrDict {
@@ -124,3 +144,5 @@ fn move_all_into(target: &mut PointedSet, src: PointedSet) {
         target.insert(p.clone());
     }
 }
+
+pub fn print_ptr_dict(data: &PointedSet) {}

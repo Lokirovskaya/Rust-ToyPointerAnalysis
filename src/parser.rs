@@ -1,5 +1,8 @@
+use std::fmt::Display;
+
 use crate::lexer::Token;
 
+#[derive(Debug)]
 pub enum Stmt {
     Ref { lhs: String, rhs: String },
     Alias { lhs: String, rhs: String },
@@ -234,15 +237,21 @@ pub fn print_ir(ir_list: &Vec<IR>) {
     for ir in ir_list.iter() {
         print!("{} ", i);
         match ir {
-            IR::Stmt(stmt) => match stmt {
-                Stmt::Ref { lhs, rhs } => println!("{} = &{}", lhs, rhs),
-                Stmt::Alias { lhs, rhs } => println!("{} = {}", lhs, rhs),
-                Stmt::DerefRead { lhs, rhs } => println!("{} = *{}", lhs, rhs),
-                Stmt::DerefWrite { lhs, rhs } => println!("*{} = {}", lhs, rhs),
-            },
+            IR::Stmt(stmt) => println!("{}", stmt),
             IR::Branch(x) => println!("branch({})", x),
             IR::Nop => println!("nop"),
         }
         i += 1;
+    }
+}
+
+impl Display for Stmt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        return match self {
+            Stmt::Ref { lhs, rhs } => write!(f, "{} = &{}", lhs, rhs),
+            Stmt::Alias { lhs, rhs } => write!(f, "{} = {}", lhs, rhs),
+            Stmt::DerefRead { lhs, rhs } => write!(f, "{} = *{}", lhs, rhs),
+            Stmt::DerefWrite { lhs, rhs } => write!(f, "*{} = {}", lhs, rhs),
+        };
     }
 }
