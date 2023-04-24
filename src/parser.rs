@@ -1,5 +1,3 @@
-use std::{rc::Rc, vec};
-
 use crate::lexer::Token;
 
 pub enum Stmt {
@@ -11,7 +9,7 @@ pub enum Stmt {
 
 pub enum IR {
     Stmt(Stmt),
-    Goto(Vec<usize>),
+    Branch(usize),
     Nop,
 }
 
@@ -143,44 +141,37 @@ fn parse_deref_write_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     ir.push(IR::Stmt(Stmt::DerefWrite { lhs, rhs }));
 }
 
-/// goto [label_1, label_2]
+/// branch label
 /// {
-///    label_1
 ///    ...
 /// }
-/// label_2
+/// label
 /// Nop
 fn parse_if_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     reader.next(); // If
     reader.next(); // {
 
-    let idx_goto = ir.len();
-    ir.push(IR::Goto(Vec::new()));
+    let idx_br = ir.len();
+    ir.push(IR::Branch(0));
 
-    let label_1 = ir.len();
     parse_stmts(reader, ir);
-    let label_2 = ir.len();
+    let label = ir.len();
 
     reader.next(); // }
     ir.push(IR::Nop);
 
     // fill back
-    match ir.get_mut(idx_goto).unwrap() {
-        IR::Goto(vec) => {
-            vec.push(label_1);
-            if label_1 != label_2 {
-                vec.push(label_2);
-            }
-        }
+    match ir.get_mut(idx_br).unwrap() {
+        IR::Branch(x) => *x = label,
         _ => unreachable!(),
     }
 }
 
-/// goto_1 [label_1, label_2]
+/// branch_1 label_2
 /// {
 ///    label_1
 ///    ...
-///    goto_2 [label_1, label_2]
+///    branch_2 label_1
 /// }
 /// label_2
 /// Nop
@@ -188,14 +179,14 @@ fn parse_while_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     reader.next(); // While
     reader.next(); // {
 
-    let idx_goto_1 = ir.len();
-    ir.push(IR::Goto(Vec::new()));
+    let idx_br_1 = ir.len();
+    ir.push(IR::Branch(0));
 
     let label_1 = ir.len();
     parse_stmts(reader, ir);
 
-    let idx_goto_2 = ir.len();
-    ir.push(IR::Goto(Vec::new()));
+    let idx_br_2 = ir.len();
+    ir.push(IR::Branch(0));
 
     let label_2 = ir.len();
 
@@ -203,22 +194,12 @@ fn parse_while_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     ir.push(IR::Nop);
 
     // fill back
-    match ir.get_mut(idx_goto_1).unwrap() {
-        IR::Goto(vec) => {
-            vec.push(label_1);
-            if label_1 != label_2 {
-                vec.push(label_2);
-            }
-        }
+    match ir.get_mut(idx_br_1).unwrap() {
+        IR::Branch(x) => *x = label_2,
         _ => unreachable!(),
     }
-    match ir.get_mut(idx_goto_2).unwrap() {
-        IR::Goto(vec) => {
-            vec.push(label_1);
-            if label_1 != label_2 {
-                vec.push(label_2);
-            }
-        }
+    match ir.get_mut(idx_br_2).unwrap() {
+        IR::Branch(x) => *x = label_1,
         _ => unreachable!(),
     }
 }
@@ -259,7 +240,7 @@ pub fn print_ir(ir_list: &Vec<IR>) {
                 Stmt::DerefRead { lhs, rhs } => println!("{} = *{}", lhs, rhs),
                 Stmt::DerefWrite { lhs, rhs } => println!("*{} = {}", lhs, rhs),
             },
-            IR::Goto(goto_vec) => println!("goto {:?}", goto_vec),
+            IR::Branch(x) => println!("branch({})", x),
             IR::Nop => println!("nop"),
         }
         i += 1;
