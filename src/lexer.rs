@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub enum Token {
-    Var { name: String },
+    Var(String),
     Ampersand,
     Star,
     Semicolon,
@@ -45,7 +45,7 @@ pub fn get_tokens(source: &str) -> Vec<Token> {
                     match ident.as_str() {
                         "while" => ans.push(Token::While),
                         "if" => ans.push(Token::If),
-                        _ => ans.push(Token::Var { name: ident }),
+                        _ => ans.push(Token::Var(ident)),
                     }
                     i -= 1;
                 }
