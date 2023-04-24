@@ -1,100 +1,126 @@
-use crate::parser::{Stmt, StmtKind};
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, VecDeque};
 
+use crate::parser::{Stmt, IR};
 
-type SolveResult = BTreeMap<String, BTreeSet<String>>;
+type PointedSet = BTreeSet<String>;
+type PtrDict = HashMap<String, PointedSet>;
 
-pub fn solve(stmts: &Vec<Stmt>) -> SolveResult {
-    let mut result = SolveResult::new();
+pub struct Node {
+    stmt: Option<Stmt>,
+    next: Vec<usize>,
+    data: PtrDict,
+}
 
-    for stmt in stmts.iter() {
-        if !result.contains_key(&stmt.lhs) {
-            result.insert(stmt.lhs.clone(), BTreeSet::new());
-        }
-        if !result.contains_key(&stmt.rhs) {
-            result.insert(stmt.rhs.clone(), BTreeSet::new());
+pub fn solve(ir_list: Vec<IR>) -> Vec<Node> {
+    let mut nodes = Vec::<Node>::with_capacity(ir_list.len());
+
+    let mut i = 0;
+    for ir in ir_list {
+        let mut stmt = None;
+        let mut next = Vec::<usize>::with_capacity(2);
+        next.push(i + 1);
+        match ir {
+            IR::Stmt(s) => stmt = Some(s),
+            IR::Branch(x) => next.push(x),
+            _ => (),
+        };
+        nodes.push(Node {
+            stmt,
+            next,
+            data: PtrDict::new(),
+        });
+        i += 1;
+    }
+
+    let mut queue: VecDeque<usize> = (0..nodes.len()).into_iter().collect();
+
+    while !queue.is_empty() {
+        let node_idx = queue.pop_front().unwrap();
+        let node_mut = nodes.get_mut(node_idx).unwrap();
+        transfer(&mut node_mut.data, &node_mut.stmt);
+
+        let node = &nodes[node_idx];
+        let out = &node.data;
+        for succ_idx in node.next.iter() {
+            let succ_node = &nodes[*succ_idx];
+            let try_data = transfer_clone(out, &succ_node.stmt);
+            if succ_node.data != try_data {
+                queue.push_back(*succ_idx);
+            }
         }
     }
 
-    let mut change_ocurred = true;
+    return nodes;
+}
 
-    while change_ocurred {
-        change_ocurred = false;
-        for stmt in stmts.iter() {
-            match stmt.kind {
-                StmtKind::Ref => {
-                    let lhs_set = result.get_mut(&stmt.lhs).unwrap();
-                    if !lhs_set.contains(&stmt.rhs) {
-                        lhs_set.insert(stmt.rhs.clone());
-                        change_ocurred = true;
+fn transfer_clone(data: &PtrDict, stmt: &Option<Stmt>) -> PtrDict {
+    let mut result = data.clone();
+    transfer(&mut result, stmt);
+    return result;
+}
+
+fn transfer(data: &mut PtrDict, stmt: &Option<Stmt>) {
+    if let Some(stmt) = stmt {
+        match stmt {
+            Stmt::Ref { lhs, rhs } => {
+                if !data.contains_key(lhs) {
+                    data.insert(lhs.clone(), PointedSet::new());
+                }
+                let l_set = data.get_mut(lhs).unwrap();
+                l_set.insert(rhs.clone());
+            }
+            Stmt::Alias { lhs, rhs } => {
+                if !data.contains_key(rhs) {
+                    return;
+                }
+                let r_set = data[rhs].clone();
+                if !data.contains_key(lhs) {
+                    data.insert(lhs.clone(), PointedSet::new());
+                }
+                let l_set = data.get_mut(lhs).unwrap();
+                move_all_into(l_set, r_set);
+            }
+            Stmt::DerefRead { lhs, rhs } => {
+                if !data.contains_key(rhs) {
+                    return;
+                }
+                let r_set = &data[rhs];
+                let mut union_of_v_set = PointedSet::new();
+                for v in r_set.iter() {
+                    if let Some(v_set) = data.get(v) {
+                        move_all_into(&mut union_of_v_set, v_set.clone());
                     }
                 }
-
-                StmtKind::Alias => {
-                    let lhs_set = &result[&stmt.lhs];
-                    let rhs_set = &result[&stmt.rhs];
-                    let mut new_lhs_set = lhs_set.clone();
-                    insert_set_into(&mut new_lhs_set, &rhs_set);
-                    if lhs_set.len() < new_lhs_set.len() {
-                        change_ocurred = true;
-                    }
-                    result.insert(stmt.lhs.clone(), new_lhs_set);
+                if !data.contains_key(lhs) {
+                    data.insert(lhs.clone(), PointedSet::new());
                 }
-
-                StmtKind::DerefRead => {
-                    let lhs_set = &result[&stmt.lhs];
-                    let rhs_set = &result[&stmt.rhs];
-                    let mut new_lhs_set = lhs_set.clone();
-                    for v in rhs_set.iter() {
-                        let v_set = result[v].clone();
-                        insert_set_into(&mut new_lhs_set, &v_set);
-                    }
-                    if lhs_set.len() < new_lhs_set.len() {
-                        change_ocurred = true;
-                    }
-                    result.insert(stmt.lhs.clone(), new_lhs_set);
+                let l_set = data.get_mut(lhs).unwrap();
+                move_all_into(l_set, union_of_v_set);
+            }
+            Stmt::DerefWrite { lhs, rhs } => {
+                if !data.contains_key(rhs) {
+                    return;
                 }
-
-                StmtKind::DerefWrite => {
-                    let lhs_set = result[&stmt.lhs].clone();
-                    for v in lhs_set.iter() {
-                        let v_set = &result[v];
-                        let mut new_v_set = v_set.clone();
-                        let rhs_set = result[&stmt.rhs].clone();
-                        insert_set_into(&mut new_v_set, &rhs_set);
-                        if v_set.len() < new_v_set.len() {
-                            change_ocurred = true;
-                            result.insert(v.clone(), new_v_set);
+                let r_set = data[rhs].clone();
+                if !data.contains_key(lhs) {
+                    data.insert(lhs.clone(), r_set);
+                } else {
+                    let l_set = data[lhs].clone();
+                    for v in l_set {
+                        if let Some(v_set) = data.get(&v) {
+                            let mut new_v_set = v_set.clone();
+                            move_all_into(&mut new_v_set, r_set.clone());
+                            data.insert(v, new_v_set);
                         }
                     }
                 }
             }
         }
     }
-    return result;
 }
 
-fn insert_set_into(target: &mut BTreeSet<String>, src: &BTreeSet<String>) {
-    for s in src.iter() {
-        if !target.contains(s) {
-            target.insert(s.clone());
-        }
-    }
-}
-
-pub fn print_solve_result(result: &SolveResult) {
-    for (k, v) in result {
-        print!("{} -> [", k);
-        let mut i = 0;
-        for s in v {
-            if i != v.len() - 1 {
-                print!("{}, ", s);
-            } else {
-                print!("{}", s);
-            }
-            i += 1;
-        }
-        println!("]");
+fn move_all_into(target: &mut PointedSet, src: PointedSet) {
+    for p in src.iter() {
+        target.insert(p.clone());
     }
 }

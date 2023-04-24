@@ -3,7 +3,7 @@ use std::io::Read;
 
 mod lexer;
 mod parser;
-// mod solver;
+mod solver;
 
 fn main() {
     let mut file = File::open("input.txt").unwrap();
@@ -14,4 +14,6 @@ fn main() {
     let ir_list = parser::parse(tokens);
 
     parser::print_ir(&ir_list);
+
+    let nodes = solver::solve(ir_list);
 }
