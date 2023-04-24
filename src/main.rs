@@ -4,7 +4,7 @@ use std::io::Read;
 mod cfg;
 mod lexer;
 mod parser;
-mod solver;
+// mod solver;
 
 fn main() {
     let mut file = File::open("input.txt").unwrap();
@@ -12,11 +12,7 @@ fn main() {
     file.read_to_string(&mut content).unwrap();
 
     let tokens = lexer::get_tokens(&content);
-    println!("{:?}", tokens);
+    let ir_list = parser::parse(tokens);
 
-    // let stmts = lexer::get_stmts( &content);
-
-    // let solve_result = solver::solve(&stmts);
-
-    // solver::print_solve_result(&solve_result);
+    parser::print_ir(&ir_list);
 }
