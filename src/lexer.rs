@@ -7,6 +7,7 @@ pub enum Token {
     Assign,
     LeftBrace,
     RightBrace,
+    Sharp,
     If,
     While,
 }
@@ -26,6 +27,7 @@ pub fn get_tokens(source: &str) -> Vec<Token> {
             b'=' => ans.push(Token::Assign),
             b'{' => ans.push(Token::LeftBrace),
             b'}' => ans.push(Token::RightBrace),
+            b'#' => ans.push(Token::Sharp),
             _ => {
                 if i < bytes.len() && bytes[i].is_ascii_whitespace() {
                     i += 1;
@@ -35,7 +37,7 @@ pub fn get_tokens(source: &str) -> Vec<Token> {
                     i -= 1;
                 }
 
-                if i < bytes.len() && (bytes[i].is_ascii_alphabetic() || bytes[i] == b'_') {
+                if i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
                     let mut ident = String::new();
                     while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_')
                     {

@@ -13,24 +13,27 @@ pub enum Stmt {
 pub enum IR {
     Stmt(Stmt),
     Branch(usize),
+    Check(String),
     Nop,
 }
 
 /// CompileStart -> Stmts
 /// Stmts -> Stmt+
-/// Stmt -> RefStmt | AliasStmt | DerefReadStmt | DerefWriteStmt | IfStmt | WhileStmt | ;
+/// Stmt -> RefStmt | AliasStmt | DerefReadStmt | DerefWriteStmt | IfStmt | WhileStmt | CheckStmt | ;
 /// RefStmt -> VAR = & VAR ;
 /// AliasStmt -> VAR = VAR ;
 /// DerefReadStmt -> VAR = * VAR ;
 /// DerefWriteStmt -> * VAR = VAR ;
 /// IfStmt -> IF '{' Stmts '}'
 /// WhileStmt -> WHILE '{' Stmts '}'
-/// note: Stmt starts with one of [VAR, *, IF, WHILE]
+/// CheckStmt -> # TAG
+/// note: Stmt starts with one of [VAR, *, IF, WHILE, #]
 
 pub fn parse(tokens: Vec<Token>) -> Vec<IR> {
     let mut reader = TokenReader { tokens, i: 0 };
     let mut ir = Vec::<IR>::new();
     parse_stmts(&mut reader, &mut ir);
+    ir.push(IR::Check("(End)".to_string()));
     return ir;
 }
 
@@ -38,7 +41,7 @@ fn parse_stmts(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     while !reader.is_eof()
         && matches!(
             reader.peek(),
-            Token::Var(_) | Token::Star | Token::If | Token::While
+            Token::Var(_) | Token::Star | Token::If | Token::While | Token::Sharp
         )
     {
         parse_stmt(reader, ir);
@@ -50,6 +53,7 @@ fn parse_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
         Token::If => parse_if_stmt(reader, ir),
         Token::While => parse_while_stmt(reader, ir),
         Token::Star => parse_deref_write_stmt(reader, ir),
+        Token::Sharp => parse_check_stmt(reader, ir),
         Token::Semicolon => reader.next(),
         Token::Var(_) => {
             if let Some(forward) = reader.peek_forward(2) {
@@ -144,11 +148,16 @@ fn parse_deref_write_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     ir.push(IR::Stmt(Stmt::DerefWrite { lhs, rhs }));
 }
 
-/// branch label
-/// {
+/// branch label_1, label_2, label_3
+/// if {
+///    label_1
 ///    ...
 /// }
-/// label
+/// else {
+///    label_2
+///    ...
+/// }
+/// label_3
 /// Nop
 fn parse_if_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     reader.next(); // If
@@ -207,6 +216,18 @@ fn parse_while_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     }
 }
 
+fn parse_check_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
+    reader.next(); // #
+    let tag = match reader.peek() {
+        Token::Var(s) => s,
+        _ => unreachable!(),
+    }
+    .clone();
+    reader.next(); // Tag
+
+    ir.push(IR::Check(tag));
+}
+
 struct TokenReader {
     tokens: Vec<Token>,
     i: usize,
@@ -232,6 +253,7 @@ impl TokenReader {
     }
 }
 
+
 pub fn print_ir(ir_list: &Vec<IR>) {
     let mut i = 0;
     for ir in ir_list.iter() {
@@ -240,9 +262,11 @@ pub fn print_ir(ir_list: &Vec<IR>) {
             IR::Stmt(stmt) => println!("{}", stmt),
             IR::Branch(x) => println!("branch({})", x),
             IR::Nop => println!("nop"),
+            IR::Check(tag) => println!("# {}", tag),
         }
         i += 1;
     }
+    println!();
 }
 
 impl Display for Stmt {
