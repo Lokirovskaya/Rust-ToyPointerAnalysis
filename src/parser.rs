@@ -24,7 +24,7 @@ pub enum IR {
 /// AliasStmt -> VAR = VAR ;
 /// DerefReadStmt -> VAR = * VAR ;
 /// DerefWriteStmt -> * VAR = VAR ;
-/// IfStmt -> IF '{' Stmts '}'
+/// IfStmt -> IF '{' Stmts '}' [ else '{' Stmts '}' ] 
 /// WhileStmt -> WHILE '{' Stmts '}'
 /// CheckStmt -> # TAG
 /// note: Stmt starts with one of [VAR, *, IF, WHILE, #]
