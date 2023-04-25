@@ -64,7 +64,7 @@ pub fn solve(ir_list: Vec<IR>) {
         }
     }
 
-    print_on_tag(nodes);
+    print_result(nodes).unwrap();
 }
 
 fn meet(data: &mut PtrDict, src: &PtrDict) {
@@ -144,31 +144,35 @@ fn move_all_into(target: &mut PointedSet, src: PointedSet) {
     }
 }
 
-pub fn print_on_tag(nodes: Vec<Node>) {
+pub fn print_result(nodes: Vec<Node>) -> std::io::Result<()> {
+    use std::fs::File;
+    use std::io::Write;
+    let mut file = File::create("output.txt")?;
     for node in nodes {
         if let Some(tag) = node.tag {
-            println!("# {}:", tag);
+            writeln!(file, "# {}:", tag)?;
             if node.data.is_empty() {
-                println!("  null");
+                writeln!(file, "  null")?;
             } else {
                 let mut keys: Vec<(String, PointedSet)> = node.data.into_iter().collect();
                 keys.sort_by_key(|k| k.0.to_string());
                 for (var, set) in keys {
-                    print!("  {} -> [", var);
+                    write!(file, "  {} -> [", var)?;
                     let mut i = 0;
                     let len = set.len();
                     for s in set {
                         if i < len - 1 {
-                            print!("{}, ", s);
+                            write!(file, "{}, ", s)?;
                         } else {
-                            print!("{}", s);
+                            write!(file, "{}", s)?;
                         }
                         i += 1;
                     }
-                    println!("]");
+                    writeln!(file, "]")?;
                 }
             }
-            println!();
+            writeln!(file)?;
         }
     }
+    return Ok(());
 }
