@@ -18,19 +18,22 @@ pub fn solve(ir_list: Vec<IR>) {
 
     let mut i = 0;
     let len = ir_list.len();
+
     for ir in ir_list {
         let mut stmt = None;
-        let mut next = Vec::<usize>::with_capacity(2);
+        let mut next = Vec::<usize>::new();
         let mut tag = None;
-        if i + 1 < len {
-            next.push(i + 1);
-        }
         match ir {
             IR::Stmt(s) => stmt = Some(s),
-            IR::Branch(x) => next.push(x),
+            IR::Branch(vec) => next.clone_from(&vec),
             IR::Check(t) => tag = Some(t),
             _ => (),
         };
+        if next.is_empty() {
+            if i + 1 < len {
+                next.push(i + 1);
+            }
+        }
         nodes.push(Node {
             stmt,
             next,

@@ -9,6 +9,7 @@ pub enum Token {
     RightBrace,
     Sharp,
     If,
+    Else,
     While,
 }
 
@@ -47,6 +48,7 @@ pub fn get_tokens(source: &str) -> Vec<Token> {
                     match ident.as_str() {
                         "while" => ans.push(Token::While),
                         "if" => ans.push(Token::If),
+                        "else" => ans.push(Token::Else),
                         _ => ans.push(Token::Var(ident)),
                     }
                     i -= 1;

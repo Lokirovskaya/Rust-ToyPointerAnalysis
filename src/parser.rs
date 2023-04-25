@@ -12,7 +12,7 @@ pub enum Stmt {
 
 pub enum IR {
     Stmt(Stmt),
-    Branch(usize),
+    Branch(Vec<usize>),
     Check(String),
     Nop,
 }
@@ -148,10 +148,11 @@ fn parse_deref_write_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     ir.push(IR::Stmt(Stmt::DerefWrite { lhs, rhs }));
 }
 
-/// branch label_1, label_2, label_3
+/// branch_1 label_1, label_2, label_3
 /// if {
 ///    label_1
 ///    ...
+///    branch_2 label_3
 /// }
 /// else {
 ///    label_2
@@ -160,30 +161,56 @@ fn parse_deref_write_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
 /// label_3
 /// Nop
 fn parse_if_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
+    let idx_br_1 = ir.len();
+    ir.push(IR::Branch(Vec::new()));
+
     reader.next(); // If
     reader.next(); // {
-
-    let idx_br = ir.len();
-    ir.push(IR::Branch(0));
-
+    let label_1 = ir.len();
     parse_stmts(reader, ir);
-    let label = ir.len();
 
+    let idx_br_2 = ir.len();
+    ir.push(IR::Branch(Vec::new()));
+    
     reader.next(); // }
+
+    let mut label_2: Option<usize> = None;
+    if let Token::Else = reader.peek() {
+        reader.next(); // else
+        reader.next(); // {
+        label_2 = Some(ir.len());
+        parse_stmts(reader, ir);
+        reader.next(); // }
+    }
+
+    let label_3 = ir.len();
+
     ir.push(IR::Nop);
 
     // fill back
-    match ir.get_mut(idx_br).unwrap() {
-        IR::Branch(x) => *x = label,
+    match ir.get_mut(idx_br_1).unwrap() {
+        IR::Branch(vec) => {
+            vec.push(label_1);
+            if let Some(label_2) = label_2 {
+                vec.push(label_2);
+            }
+            vec.push(label_3);
+        }
+        _ => unreachable!(),
+    }
+    match ir.get_mut(idx_br_2).unwrap() {
+        IR::Branch(vec) => {
+            vec.push(label_3);
+        }
         _ => unreachable!(),
     }
 }
 
-/// branch_1 label_2
-/// {
+/// branch_1 label_1 label_2
+/// while {
 ///    label_1
 ///    ...
-///    branch_2 label_1
+///    branch_2 label_1 label_1
 /// }
 /// label_2
 /// Nop
@@ -192,13 +219,13 @@ fn parse_while_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
     reader.next(); // {
 
     let idx_br_1 = ir.len();
-    ir.push(IR::Branch(0));
+    ir.push(IR::Branch(Vec::new()));
 
     let label_1 = ir.len();
     parse_stmts(reader, ir);
 
     let idx_br_2 = ir.len();
-    ir.push(IR::Branch(0));
+    ir.push(IR::Branch(Vec::new()));
 
     let label_2 = ir.len();
 
@@ -207,11 +234,17 @@ fn parse_while_stmt(reader: &mut TokenReader, ir: &mut Vec<IR>) {
 
     // fill back
     match ir.get_mut(idx_br_1).unwrap() {
-        IR::Branch(x) => *x = label_2,
+        IR::Branch(vec) => {
+            vec.push(label_1);
+            vec.push(label_2);
+        }
         _ => unreachable!(),
     }
     match ir.get_mut(idx_br_2).unwrap() {
-        IR::Branch(x) => *x = label_1,
+        IR::Branch(vec) => {
+            vec.push(label_1);
+            vec.push(label_2);
+        }
         _ => unreachable!(),
     }
 }
@@ -253,14 +286,13 @@ impl TokenReader {
     }
 }
 
-
-pub fn print_ir(ir_list: &Vec<IR>) {
+pub fn _print_ir(ir_list: &Vec<IR>) {
     let mut i = 0;
     for ir in ir_list.iter() {
         print!("{} ", i);
         match ir {
             IR::Stmt(stmt) => println!("{}", stmt),
-            IR::Branch(x) => println!("branch({})", x),
+            IR::Branch(x) => println!("branch({:?})", x),
             IR::Nop => println!("nop"),
             IR::Check(tag) => println!("# {}", tag),
         }

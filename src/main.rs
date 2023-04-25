@@ -13,7 +13,7 @@ fn main() {
     let tokens = lexer::get_tokens(&content);
     let ir_list = parser::parse(tokens);
 
-    // parser::print_ir(&ir_list);
+    parser::_print_ir(&ir_list);
 
     solver::solve(ir_list);
 }
