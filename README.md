@@ -8,8 +8,9 @@
 
 **支持 4 种指针语句**
 
-| Reference         | `a = &b;` |
+| 语句               | 格式      |
 | ----------------- | --------- |
+| Reference         | `a = &b;` |
 | Alias             | `a = b;`  |
 | Dereference Read  | `a = *b;` |
 | Dereference Write | `*a = b;` |
